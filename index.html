@@ -386,6 +386,167 @@
             });
         });
 
+        // 道具定义
+        const POWERUPS = {
+            SPEED_UP: { id: 'speed_up', emoji: '⚡', name: '加速', duration: 5 },
+            SPEED_DOWN: { id: 'speed_down', emoji: '🐢', name: '减速', duration: 5 },
+            DOUBLE: { id: 'double', emoji: '🔀', name: '大方块', duration: 1 },
+            BOMB: { id: 'bomb', emoji: '💣', name: '炸弹' },
+            FIRE: { id: 'fire', emoji: '🔥', name: '火焰' },
+            STAR: { id: 'star', emoji: '⭐', name: '星星' }
+        };
+
+        let powerupQueue = [];
+
+        // 生成道具
+        function spawnPowerup(player) {
+            const types = Object.keys(POWERUPS);
+            const type = types[Math.floor(Math.random() * types.length)];
+            powerupQueue.push({ type, timestamp: Date.now() });
+
+            // 清理过期道具（超过10个）
+            if (powerupQueue.length > 10) {
+                powerupQueue.shift();
+            }
+        }
+
+        // 使用道具
+        function usePowerup(player, index) {
+            if (player.cooldowns[index] > 0) return;
+
+            const powerup = powerupQueue.shift();
+            if (!powerup) return;
+
+            const type = POWERUPS[powerup.type];
+
+            switch (type.id) {
+                case 'speed_up':
+                    player.effects.fast += type.duration;
+                    break;
+                case 'speed_down':
+                    player.effects.slow += type.duration;
+                    break;
+                case 'double':
+                    player.effects.double += type.duration;
+                    break;
+                case 'bomb':
+                    clearRow(player, player.currentPiece.y);
+                    break;
+                case 'fire':
+                    clearSameColor(player);
+                    break;
+                case 'star':
+                    clearRandomRows(player, 3);
+                    break;
+            }
+
+            player.cooldowns[index] = 3;
+            updatePowerupUI();
+        }
+
+        // 更新道具冷却
+        function updateCooldowns() {
+            for (let i = 1; i <= 3; i++) {
+                if (player1.cooldowns[i] > 0) {
+                    player1.cooldowns[i]--;
+                }
+                if (player2.cooldowns[i] > 0) {
+                    player2.cooldowns[i]--;
+                }
+            }
+            updatePowerupUI();
+        }
+
+        // 更新道具 UI
+        function updatePowerupUI() {
+            const cooldownEl = document.getElementById('cooldown');
+            const allCooldown = Math.min(
+                player1.cooldowns[1],
+                player1.cooldowns[2],
+                player1.cooldowns[3],
+                player2.cooldowns[1],
+                player2.cooldowns[2],
+                player2.cooldowns[3]
+            );
+            cooldownEl.textContent = allCooldown > 0 ? allCooldown : 3;
+        }
+
+        // 应用道具效果到速度
+        function applyPowerupEffects(player) {
+            // 减速效果
+            if (player.effects.slow > 0) {
+                player.effects.slow--;
+                player.speed = Math.max(300, 500 - 100);
+            }
+            // 加速效果
+            else if (player.effects.fast > 0) {
+                player.effects.fast--;
+                player.speed = Math.min(800, 500 + 100);
+            }
+
+            // 大方块效果
+            if (player.effects.double > 0) {
+                player.effects.double--;
+                player.currentPiece.shape = [
+                    [player.currentPiece.shape[0]],
+                    [player.currentPiece.shape[1]],
+                    [player.currentPiece.shape[2]],
+                    [player.currentPiece.shape[3]]
+                ];
+            }
+        }
+
+        // 消除当前行下方所有方块
+        function clearRow(player, row) {
+            for (let y = row; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    player.board[y][x] = 0;
+                    createParticles(x, y, COLORS[Math.floor(Math.random() * 7) + 1]);
+                }
+            }
+        }
+
+        // 消除所有相同颜色的方块
+        function clearSameColor(player) {
+            if (!player.currentPiece) return;
+
+            const color = player.currentPiece.type;
+            let cleared = 0;
+
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    if (player.board[y][x] === color) {
+                        player.board[y][x] = 0;
+                        cleared++;
+                        createParticles(x, y, COLORS[color]);
+                    }
+                }
+            }
+
+            if (cleared > 0) {
+                player.score += cleared * 10;
+                updateUI();
+            }
+        }
+
+        // 随机消除3行
+        function clearRandomRows(player, count) {
+            let cleared = 0;
+            for (let i = 0; i < count; i++) {
+                const row = Math.floor(Math.random() * ROWS);
+                if (player.board[row].every(cell => cell !== 0)) {
+                    player.board.splice(row, 1);
+                    player.board.unshift(Array(COLS).fill(0));
+                    cleared++;
+                }
+            }
+
+            if (cleared > 0) {
+                player.score += cleared * 50;
+                updateUI();
+            }
+        }
+
         function createPiece() {
             const type = Math.floor(Math.random() * 7) + 1;
             return {
@@ -605,6 +766,9 @@
         function gameLoop(player) {
             if (player.isPaused || player.isGameOver) return;
 
+            updateCooldowns();
+            applyPowerupEffects(player);
+
             if (!movePiece(player, 0, 1)) {
                 lockPiece(player);
             }
@@ -621,6 +785,13 @@
             }
             if (event.key === 'q' || event.key === 'Q') {
                 togglePause(player2);
+                return;
+            }
+
+            // 使用道具
+            if (event.key >= '1' && event.key <= '3') {
+                const index = parseInt(event.key);
+                usePowerup(player1, index);
                 return;
             }
 
