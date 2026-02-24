@@ -444,6 +444,49 @@
             updatePowerupUI();
         }
 
+        // 粒子系统变量
+        const particles = [];
+
+        // 创建粒子
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x: x * BLOCK_SIZE + BLOCK_SIZE / 2,
+                    y: y * BLOCK_SIZE + BLOCK_SIZE / 2,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        // 更新粒子
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.2; // 重力
+                p.life -= 0.02;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // 绘制粒子
+        function drawParticles(ctx) {
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
         // 更新道具冷却
         function updateCooldowns() {
             for (let i = 1; i <= 3; i++) {
@@ -629,6 +672,7 @@
                         const boardX = player.currentPiece.x + x;
                         if (boardY >= 0) {
                             player.board[boardY][boardX] = player.currentPiece.type;
+                            createParticles(boardX, boardY, COLORS[player.currentPiece.type]);
                         }
                     }
                 }
@@ -649,6 +693,12 @@
 
             for (let y = ROWS - 1; y >= 0; y--) {
                 if (player.board[y].every(cell => cell !== 0)) {
+                    // 为每个方块创建粒子
+                    for (let x = 0; x < COLS; x++) {
+                        if (player.board[y][x]) {
+                            createParticles(x, y, COLORS[player.board[y][x]]);
+                        }
+                    }
                     player.board.splice(y, 1);
                     player.board.unshift(Array(COLS).fill(0));
                     linesCleared++;
@@ -707,6 +757,10 @@
                     }
                 }
             }
+
+            // 更新并绘制粒子
+            updateParticles();
+            drawParticles(ctx);
 
             // 绘制当前方块
             if (player.currentPiece) {
