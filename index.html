@@ -514,6 +514,28 @@
             cooldownEl.textContent = allCooldown > 0 ? allCooldown : 3;
         }
 
+        // 更新难度（单人模式）
+        function updateDifficulty(player) {
+            const newLevel = Math.floor(player.lines / 10) + 1;
+            if (newLevel > player.level) {
+                player.level = newLevel;
+                player.speed = Math.max(300, 500 - (player.level - 1) * 50);
+            }
+        }
+
+        // 根据得分差调整难度（双人模式）
+        function adjustDifficultyBasedOnScore() {
+            const diff = player1.score - player2.score;
+
+            if (diff > 0) {
+                // 玩家1领先，玩家2减速
+                player2.speed = Math.max(300, player2.speed - 5);
+            } else if (diff < 0) {
+                // 玩家2领先，玩家1减速
+                player1.speed = Math.max(300, player1.speed - 5);
+            }
+        }
+
         // 应用道具效果到速度
         function applyPowerupEffects(player) {
             // 减速效果
@@ -717,6 +739,10 @@
                     player.level = newLevel;
                     updateGameSpeed(player);
                 }
+
+                // 更新难度
+                updateDifficulty(player);
+                adjustDifficultyBasedOnScore();
 
                 updateUI();
             }
