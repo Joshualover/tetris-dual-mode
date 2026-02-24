@@ -334,10 +334,6 @@
             startGame();
         }
 
-        function resetBoard() {
-            board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
-        }
-
         // 玩家1初始化
         player1.init = function() {
             this.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
@@ -400,19 +396,20 @@
             };
         }
 
-        function spawnPiece() {
-            currentPiece = nextPiece;
-            nextPiece = createPiece();
+        function spawnPiece(player) {
+            player.currentPiece = player.nextPiece;
+            player.nextPiece = createPiece();
             drawNextPiece();
 
             // 检查游戏是否结束
-            if (!isValidMove(currentPiece, 0, 0)) {
-                gameOver();
+            if (!isValidMove(player, player.currentPiece, 0, 0)) {
+                gameOver(player);
             }
         }
 
-        function isValidMove(piece, offsetX, offsetY, newShape = null) {
+        function isValidMove(player, piece, offsetX, offsetY, newShape = null) {
             const shape = newShape || piece.shape;
+            const board = player.board;
             for (let y = 0; y < shape.length; y++) {
                 for (let x = 0; x < shape[y].length; x++) {
                     if (shape[y][x]) {
@@ -431,62 +428,68 @@
             return true;
         }
 
-        function rotatePiece() {
-            const rotated = currentPiece.shape[0].map((_, i) =>
-                currentPiece.shape.map(row => row[i]).reverse()
+        function rotatePiece(player) {
+            const rotated = player.currentPiece.shape[0].map((_, i) =>
+                player.currentPiece.shape.map(row => row[i]).reverse()
             );
 
-            if (isValidMove(currentPiece, 0, 0, rotated)) {
-                currentPiece.shape = rotated;
-            } else if (isValidMove(currentPiece, -1, 0, rotated)) {
-                currentPiece.x -= 1;
-                currentPiece.shape = rotated;
-            } else if (isValidMove(currentPiece, 1, 0, rotated)) {
-                currentPiece.x += 1;
-                currentPiece.shape = rotated;
+            if (isValidMove(player.currentPiece, 0, 0, rotated)) {
+                player.currentPiece.shape = rotated;
+            } else if (isValidMove(player.currentPiece, -1, 0, rotated)) {
+                player.currentPiece.x -= 1;
+                player.currentPiece.shape = rotated;
+            } else if (isValidMove(player.currentPiece, 1, 0, rotated)) {
+                player.currentPiece.x += 1;
+                player.currentPiece.shape = rotated;
             }
         }
 
-        function movePiece(dx, dy) {
-            if (isValidMove(currentPiece, dx, dy)) {
-                currentPiece.x += dx;
-                currentPiece.y += dy;
+        function movePiece(player, dx, dy) {
+            if (isValidMove(player.currentPiece, dx, dy)) {
+                player.currentPiece.x += dx;
+                player.currentPiece.y += dy;
                 return true;
             }
             return false;
         }
 
-        function hardDrop() {
-            while (movePiece(0, 1)) {
-                score += 2;
+        function hardDrop(player) {
+            while (movePiece(player, 0, 1)) {
+                player.score += 2;
             }
-            lockPiece();
+            lockPiece(player);
         }
 
-        function lockPiece() {
-            for (let y = 0; y < currentPiece.shape.length; y++) {
-                for (let x = 0; x < currentPiece.shape[y].length; x++) {
-                    if (currentPiece.shape[y][x]) {
-                        const boardY = currentPiece.y + y;
-                        const boardX = currentPiece.x + x;
+        function lockPiece(player) {
+            for (let y = 0; y < player.currentPiece.shape.length; y++) {
+                for (let x = 0; x < player.currentPiece.shape[y].length; x++) {
+                    if (player.currentPiece.shape[y][x]) {
+                        const boardY = player.currentPiece.y + y;
+                        const boardX = player.currentPiece.x + x;
                         if (boardY >= 0) {
-                            board[boardY][boardX] = currentPiece.type;
+                            player.board[boardY][boardX] = player.currentPiece.type;
                         }
                     }
                 }
             }
 
-            clearLines();
-            spawnPiece();
+            clearLines(player);
+
+            // 每5行生成一个道具
+            if (player.lines >= 5) {
+                spawnPowerup(player);
+            }
+
+            spawnPiece(player);
         }
 
-        function clearLines() {
+        function clearLines(player) {
             let linesCleared = 0;
 
             for (let y = ROWS - 1; y >= 0; y--) {
-                if (board[y].every(cell => cell !== 0)) {
-                    board.splice(y, 1);
-                    board.unshift(Array(COLS).fill(0));
+                if (player.board[y].every(cell => cell !== 0)) {
+                    player.board.splice(y, 1);
+                    player.board.unshift(Array(COLS).fill(0));
                     linesCleared++;
                     y++;
                 }
@@ -494,26 +497,26 @@
 
             if (linesCleared > 0) {
                 const points = [0, 100, 300, 500, 800];
-                score += points[linesCleared] * level;
-                lines += linesCleared;
+                player.score += points[linesCleared] * player.level;
+                player.lines += linesCleared;
 
                 // 升级
-                const newLevel = Math.floor(lines / 10) + 1;
-                if (newLevel > level) {
-                    level = newLevel;
-                    updateGameSpeed();
+                const newLevel = Math.floor(player.lines / 10) + 1;
+                if (newLevel > player.level) {
+                    player.level = newLevel;
+                    updateGameSpeed(player);
                 }
 
                 updateUI();
             }
         }
 
-        function updateGameSpeed() {
-            if (gameInterval) {
-                clearInterval(gameInterval);
+        function updateGameSpeed(player) {
+            if (player.speedTimer) {
+                clearTimeout(player.speedTimer);
             }
-            const speed = Math.max(100, 1000 - (level - 1) * 100);
-            gameInterval = setInterval(gameLoop, speed);
+            const speed = Math.max(100, 1000 - (player.level - 1) * 100);
+            player.speedTimer = setTimeout(() => gameLoop(player), speed);
         }
 
         function drawBlock(ctx, x, y, color, size = BLOCK_SIZE) {
@@ -530,7 +533,7 @@
             ctx.fillRect(x * size + size - 3, y * size, 3, size);
         }
 
-        function draw() {
+        function draw(player) {
             // 清空画布
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -538,33 +541,33 @@
             // 绘制游戏板
             for (let y = 0; y < ROWS; y++) {
                 for (let x = 0; x < COLS; x++) {
-                    if (board[y][x]) {
-                        drawBlock(ctx, x, y, COLORS[board[y][x]]);
+                    if (player.board[y][x]) {
+                        drawBlock(ctx, x, y, COLORS[player.board[y][x]]);
                     }
                 }
             }
 
             // 绘制当前方块
-            if (currentPiece) {
-                for (let y = 0; y < currentPiece.shape.length; y++) {
-                    for (let x = 0; x < currentPiece.shape[y].length; x++) {
-                        if (currentPiece.shape[y][x]) {
-                            drawBlock(ctx, currentPiece.x + x, currentPiece.y + y, COLORS[currentPiece.type]);
+            if (player.currentPiece) {
+                for (let y = 0; y < player.currentPiece.shape.length; y++) {
+                    for (let x = 0; x < player.currentPiece.shape[y].length; x++) {
+                        if (player.currentPiece.shape[y][x]) {
+                            drawBlock(ctx, player.currentPiece.x + x, player.currentPiece.y + y, COLORS[player.currentPiece.type]);
                         }
                     }
                 }
 
                 // 绘制幽灵方块（预览落点）
-                let ghostY = currentPiece.y;
-                while (isValidMove(currentPiece, 0, ghostY - currentPiece.y + 1)) {
+                let ghostY = player.currentPiece.y;
+                while (isValidMove(player, player.currentPiece, 0, ghostY - player.currentPiece.y + 1)) {
                     ghostY++;
                 }
 
                 ctx.globalAlpha = 0.3;
-                for (let y = 0; y < currentPiece.shape.length; y++) {
-                    for (let x = 0; x < currentPiece.shape[y].length; x++) {
-                        if (currentPiece.shape[y][x]) {
-                            drawBlock(ctx, currentPiece.x + x, ghostY + y, COLORS[currentPiece.type]);
+                for (let y = 0; y < player.currentPiece.shape.length; y++) {
+                    for (let x = 0; x < player.currentPiece.shape[y].length; x++) {
+                        if (player.currentPiece.shape[y][x]) {
+                            drawBlock(ctx, player.currentPiece.x + x, ghostY + y, COLORS[player.currentPiece.type]);
                         }
                     }
                 }
@@ -591,95 +594,132 @@
         }
 
         function updateUI() {
-            document.getElementById('score').textContent = score;
-            document.getElementById('level').textContent = level;
-            document.getElementById('lines').textContent = lines;
+            document.getElementById('score1').textContent = player1.score;
+            document.getElementById('level1').textContent = player1.level;
+            document.getElementById('lines1').textContent = player1.lines;
+            document.getElementById('score2').textContent = player2.score;
+            document.getElementById('level2').textContent = player2.level;
+            document.getElementById('lines2').textContent = player2.lines;
         }
 
-        function gameLoop() {
-            if (!movePiece(0, 1)) {
-                lockPiece();
+        function gameLoop(player) {
+            if (player.isPaused || player.isGameOver) return;
+
+            if (!movePiece(player, 0, 1)) {
+                lockPiece(player);
             }
             draw();
         }
 
         function handleKeyPress(event) {
-            if (isGameOver) return;
+            if (player1.isGameOver || player2.isGameOver) return;
 
+            // 暂停控制
             if (event.key === 'p' || event.key === 'P') {
-                togglePause();
+                togglePause(player1);
+                return;
+            }
+            if (event.key === 'q' || event.key === 'Q') {
+                togglePause(player2);
                 return;
             }
 
-            if (isPaused) return;
+            // 玩家1控制
+            if (!player1.isPaused && !player1.isGameOver) {
+                switch (event.key) {
+                    case 'ArrowLeft':
+                        movePiece(player1, -1, 0);
+                        break;
+                    case 'ArrowRight':
+                        movePiece(player1, 1, 0);
+                        break;
+                    case 'ArrowDown':
+                        movePiece(player1, 0, 1);
+                        player1.score += 1;
+                        updateUI();
+                        break;
+                    case 'ArrowUp':
+                        rotatePiece(player1);
+                        break;
+                    case ' ':
+                        hardDrop(player1);
+                        break;
+                }
+            }
 
-            switch (event.key) {
-                case 'ArrowLeft':
-                    movePiece(-1, 0);
-                    break;
-                case 'ArrowRight':
-                    movePiece(1, 0);
-                    break;
-                case 'ArrowDown':
-                    movePiece(0, 1);
-                    score += 1;
-                    updateUI();
-                    break;
-                case 'ArrowUp':
-                    rotatePiece();
-                    break;
-                case ' ':
-                    hardDrop();
-                    break;
+            // 玩家2控制
+            if (!player2.isPaused && !player2.isGameOver) {
+                switch (event.key) {
+                    case 'a':
+                    case 'A':
+                        movePiece(player2, -1, 0);
+                        break;
+                    case 'd':
+                    case 'D':
+                        movePiece(player2, 1, 0);
+                        break;
+                    case 's':
+                    case 'S':
+                        movePiece(player2, 0, 1);
+                        player2.score += 1;
+                        updateUI();
+                        break;
+                    case 'w':
+                    case 'W':
+                        rotatePiece(player2);
+                        break;
+                    case ' ':
+                        hardDrop(player2);
+                        break;
+                }
             }
 
             draw();
         }
 
-        function togglePause() {
-            if (isGameOver) return;
+        function togglePause(player) {
+            if (player.isGameOver) return;
 
-            isPaused = !isPaused;
-            const btn = document.getElementById('pauseBtn');
+            player.isPaused = !player.isPaused;
 
-            if (isPaused) {
-                btn.textContent = '继续';
-                clearInterval(gameInterval);
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#fff';
-                ctx.font = '30px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('已暂停', canvas.width / 2, canvas.height / 2);
+            if (player.isPaused) {
+                player.speedTimer = setTimeout(() => {
+                    player.speedTimer = null;
+                    if (!player.isGameOver && !player.isPaused) {
+                        gameLoop(player);
+                    }
+                }, 1000);
             } else {
-                btn.textContent = '暂停';
-                updateGameSpeed();
+                if (player.speedTimer) {
+                    clearTimeout(player.speedTimer);
+                    player.speedTimer = null;
+                }
+                gameLoop(player);
             }
         }
 
-        function gameOver() {
-            isGameOver = true;
-            clearInterval(gameInterval);
-            document.getElementById('finalScore').textContent = score;
-            document.getElementById('gameOver').style.display = 'block';
+        function gameOver(player) {
+            player.isGameOver = true;
+            if (player.speedTimer) {
+                clearTimeout(player.speedTimer);
+            }
         }
 
-        function restartGame() {
-            document.getElementById('gameOver').style.display = 'none';
-            score = 0;
-            level = 1;
-            lines = 0;
-            isGameOver = false;
-            isPaused = false;
-            updateUI();
-            resetBoard();
-            nextPiece = createPiece();
-            spawnPiece();
-            updateGameSpeed();
+        function restartGame(player) {
+            player.score = 0;
+            player.level = 1;
+            player.lines = 0;
+            player.isGameOver = false;
+            player.isPaused = false;
+            player.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+            player.nextPiece = createPiece();
+            spawnPiece(player);
+            updateGameSpeed(player);
         }
 
         function startGame() {
-            updateGameSpeed();
+            player1.speedTimer = setTimeout(() => gameLoop(player1), player1.speed);
+            player2.speedTimer = setTimeout(() => gameLoop(player2), player2.speed);
             draw();
         }
 
