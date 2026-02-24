@@ -149,49 +149,102 @@
             font-size: 18px;
             margin-bottom: 30px;
         }
+
+        .player-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .player-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .powerup-bar {
+            width: 150px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .powerups {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .powerup {
+            background: rgba(0, 255, 136, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .powerup:hover {
+            transform: scale(1.1);
+        }
+
+        .powerup:active {
+            transform: scale(0.95);
+        }
+
+        .cooldown-display {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .cooldown-display span {
+            font-weight: bold;
+            color: #00ff88;
+        }
     </style>
 </head>
 <body>
     <div class="game-container">
-        <div class="canvas-wrapper">
-            <canvas id="gameCanvas" width="300" height="600"></canvas>
-            <div class="game-over" id="gameOver">
-                <h2>游戏结束</h2>
-                <p>最终得分: <span id="finalScore">0</span></p>
-                <button class="start-btn" onclick="restartGame()">重新开始</button>
+        <!-- 玩家1区域 -->
+        <div class="player-area">
+            <h3>玩家1 (P键)</h3>
+            <div class="canvas-wrapper">
+                <canvas id="gameCanvas1" width="300" height="600"></canvas>
+            </div>
+            <div class="player-info">
+                <div>得分: <span id="score1">0</span></div>
+                <div>等级: <span id="level1">1</span></div>
+                <div>消除: <span id="lines1">0</span></div>
             </div>
         </div>
 
-        <div class="info-panel">
-            <div class="info-box">
-                <h3>得分</h3>
-                <div class="value" id="score">0</div>
+        <!-- 中间道具栏 -->
+        <div class="powerup-bar">
+            <h3>道具栏</h3>
+            <div class="powerups">
+                <div class="powerup" data-index="1">[1] ⚡</div>
+                <div class="powerup" data-index="2">[2] 🐢</div>
+                <div class="powerup" data-index="3">[3] 🔀</div>
             </div>
+            <div class="cooldown-display">冷却: <span id="cooldown">3</span>s</div>
+        </div>
 
-            <div class="info-box">
-                <h3>等级</h3>
-                <div class="value" id="level">1</div>
+        <!-- 玩家2区域 -->
+        <div class="player-area">
+            <h3>玩家2 (Q键)</h3>
+            <div class="canvas-wrapper">
+                <canvas id="gameCanvas2" width="300" height="600"></canvas>
             </div>
-
-            <div class="info-box">
-                <h3>消除行数</h3>
-                <div class="value" id="lines">0</div>
-            </div>
-
-            <div class="next-piece">
-                <h3>下一个</h3>
-                <canvas id="nextCanvas" width="120" height="120"></canvas>
-            </div>
-
-            <button class="start-btn" onclick="togglePause()" id="pauseBtn">暂停</button>
-
-            <div class="controls">
-                <h3>操作说明</h3>
-                <p><kbd>←</kbd> <kbd>→</kbd> 左右移动</p>
-                <p><kbd>↑</kbd> 旋转</p>
-                <p><kbd>↓</kbd> 加速下落</p>
-                <p><kbd>空格</kbd> 直接落下</p>
-                <p><kbd>P</kbd> 暂停游戏</p>
+            <div class="player-info">
+                <div>得分: <span id="score2">0</span></div>
+                <div>等级: <span id="level2">1</span></div>
+                <div>消除: <span id="lines2">0</span></div>
             </div>
         </div>
     </div>
@@ -265,7 +318,7 @@
 
         // 初始化
         function init() {
-            canvas = document.getElementById('gameCanvas');
+            canvas = document.getElementById('gameCanvas1');
             ctx = canvas.getContext('2d');
             nextCanvas = document.getElementById('nextCanvas');
             nextCtx = nextCanvas.getContext('2d');
@@ -328,6 +381,14 @@
             this.nextPiece = createPiece();
             spawnPiece(this);
         };
+
+        // 道具栏点击事件
+        document.querySelectorAll('.powerup').forEach(el => {
+            el.addEventListener('click', () => {
+                const index = parseInt(el.dataset.index);
+                usePowerup(player1, index);
+            });
+        });
 
         function createPiece() {
             const type = Math.floor(Math.random() * 7) + 1;
