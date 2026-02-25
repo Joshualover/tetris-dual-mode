@@ -844,7 +844,7 @@
             if (!movePiece(player, 0, 1)) {
                 lockPiece(player);
             }
-            draw();
+            draw(player);
         }
 
         function handleKeyPress(event) {
@@ -963,7 +963,8 @@
         function startGame() {
             player1.speedTimer = setTimeout(() => gameLoop(player1), player1.speed);
             player2.speedTimer = setTimeout(() => gameLoop(player2), player2.speed);
-            draw();
+            draw(player1);
+            draw(player2);
         }
 
         // 页面加载完成后初始化
